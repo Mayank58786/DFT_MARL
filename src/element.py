@@ -6,7 +6,7 @@ class Event:
         self.state = int(state)
         self.input = []
         self.old_state=int(state)
-    
+        self.output=[]
     
     def update_event(self):
         for event in self.input:
@@ -40,6 +40,40 @@ class Event:
                         self.state = 0
                         self.using_spare = 0
 
+    def event_partial_update(self,new_state):
+        if self.state == new_state:
+            pass
+        else:
+            self.state = new_state
+        for parent in self.output:
+            if parent.gate_type == 'AND': # If all inputs are 0, then state = 0, otherwise, state = 1
+                if sum([obj.state for obj in parent.input]) == 0:
+                    new_state = 0
+                else:
+                    new_state = 1 
+            elif parent.gate_type == 'OR': # If any input is != 0, then state = 0, otherwise, state = 1
+                for obj in parent.input:
+                    if obj.state != 1:
+                        new_state = 0
+                        break  
+                    else:
+                        new_state = 1           
+            elif parent.gate_type == 'FDEP': # FDEP gates only accepts one input precedence, must combine with and or events prior to input signal.
+                new_state = parent.input[0].state
+                #print(parent.name,parent.input[0].name)
+            elif parent.gate_type == 'CSP': # Cold Spare currently, only accepts 1 competitor, and 1 spare. Also the 'main' input must come first in the input list.
+                parent.main_functioning = parent.input[0].state # Is main functioning?
+                parent.spare_functioning = parent.spare.state # Is Spare functioning?     
+                if parent.main_functioning == 1:
+                    new_state = 1
+                    parent.using_spare = 0
+                elif parent.main_functioning == 0 and parent.competitor.using_spare == 0 and parent.spare_functioning == 1:
+                    new_state = 1
+                    parent.using_spare = 1
+                else:
+                    new_state = 0
+                    parent.using_spare = 0
+            parent.event_partial_update(new_state)
 class BasicEvent(Event):
     def __init__(self, name, mttr=None, repair_cost=None, failure_cost=None, initial_state=1):
         super().__init__(name, event_type="BASIC", state=initial_state)

@@ -6,11 +6,19 @@ class CustomEnvironment(ParallelEnv):
         "name": "custom_environment_v0",
     }
 
-    def __init__(self):
-        pass
-
+    def __init__(self,system):
+        self.system= system
+        self.timestep = None
+        self.possible_agents = ["red","blue"]
+    #Reset basic events to initial state received from the xml file then update intermediate events
     def reset(self, seed=None, options=None):
-        pass
+
+        self.agents = self.possible_agents.copy()
+        self.timestep = 0
+        for event in self.system.events:
+            if event.event_type=='BASIC':
+                event.state=event.initial_state
+        self.system.update_states()
 
     def step(self, actions):
         pass
