@@ -1,5 +1,5 @@
 class Event:
-    def __init__(self, name, event_type, state=None):
+    def __init__(self, name, event_type, state=1):
         self.name = name
         self.event_type = event_type
         self.initial_state=state
@@ -13,13 +13,13 @@ class Event:
             event.update_event()
         if self.event_type != 'BASIC':
                 if self.gate_type == 'AND': # If all inputs are 0, then state = 0, otherwise, state = 1
-                    if sum([obj.state for obj in self.input]) == 0:
+                    if sum([int(obj.state) for obj in self.input]) == 0:
                         self.state = 0
                     else:
                         self.state = 1 
                 elif self.gate_type == 'OR': # If any input is != 0, then state = 0, otherwise, state = 1
                     for obj in self.input:
-                        if obj.state != 1:
+                        if int(obj.state) != 1:
                             self.state = 0
                             break  
                         else:
@@ -42,18 +42,18 @@ class Event:
 
     def event_partial_update(self,new_state):
         if self.state == new_state:
-            pass
+            return
         else:
             self.state = new_state
         for parent in self.output:
             if parent.gate_type == 'AND': # If all inputs are 0, then state = 0, otherwise, state = 1
-                if sum([obj.state for obj in parent.input]) == 0:
+                if sum([int(obj.state) for obj in parent.input]) == 0:
                     new_state = 0
                 else:
                     new_state = 1 
             elif parent.gate_type == 'OR': # If any input is != 0, then state = 0, otherwise, state = 1
                 for obj in parent.input:
-                    if obj.state != 1:
+                    if int(obj.state) != 1:
                         new_state = 0
                         break  
                     else:
@@ -74,13 +74,29 @@ class Event:
                     new_state = 0
                     parent.using_spare = 0
             parent.event_partial_update(new_state)
+    
+    
+
 class BasicEvent(Event):
     def __init__(self, name, mttr=None, repair_cost=None, failure_cost=None, initial_state=1):
         super().__init__(name, event_type="BASIC", state=initial_state)
         self.mttr = int(mttr)
         self.repair_cost = int(repair_cost)
         self.failure_cost = int(failure_cost)
+        self.repairing = 0
+        self.remaining_time_to_repair = 0
+    
+    def get_repair_status(self):
+        return self.repairing
+    
+    def red_action(self):
+        'activate basic event'
+        self.event_partial_update(0)
+        self.remaining_time_to_repair = self.mttr
 
+    def blue_action(self):
+        'inactivate basic event'
+        self.repairing = 1
 
 class IntermediateTopEvent(Event):
     def __init__(self, name,event_type, gate_type=None):
@@ -93,3 +109,17 @@ class Precedence:
         self.target = target
         self.precedence_type = precedence_type
         self.competitor = competitor
+
+class No_Action(Event):
+    'No Action class' 
+
+    def __init__(self, name):
+        Event.__init__(self, name, 'No Action')
+        
+    def red_action(self):
+        'skip turn'
+        pass
+
+    def blue_action(self):
+        'skip turn'
+        pass
