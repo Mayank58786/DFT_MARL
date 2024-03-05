@@ -12,10 +12,10 @@ class Game:
         self.actions = []
         self.costs = []
         self.observations = []
-        self._set_actions()
-        self._set_observations()
-        self._set_action_costs()
-        
+        self.set_actions()
+        self.set_observations()
+        self.set_action_costs()
+
     
     def reset_game(self):
         self.system = self.system.reset_system()
@@ -24,26 +24,32 @@ class Game:
         for player in self.players:
             player.reset_player()
         
-    def _set_actions(self):
+    def set_actions(self):
         if not self.system.actions:
-            self.system._set_actions()
-        self.actions = self.system._get_actions()
+            self.system.set_actions()
+        self.actions = self.system.get_actions()
         
-    def _get_actions(self):
+    def get_actions(self):
         return self.actions
     
-    def _set_observations(self):
+    def set_costs(self):
+        self.costs = self.system.get_costs()
+
+    def get_costs(self):
+        return self.costs
+
+    def set_observations(self):
         if not self.system.observations:
-            self.system._set_observations()
-        self.observations = self.system._get_observations()
+            self.system.set_observations()
+        self.observations = self.system.get_observations()
     
-    def _get_observations(self):
+    def get_observations(self):
         return self.observations
     
-    def _set_action_costs(self):
+    def set_action_costs(self):
         self.costs = self.system.get_action_costs()
 
-    def _get_action_costs(self):
+    def get_action_costs(self):
         return self.costs
 
     def get_system_obj(self):
@@ -55,7 +61,7 @@ class Game:
     def increase_step(self):
         self.current_step += 1
 
-    def get_max_step(self):
+    def get_max_steps(self):
         return self.max_steps
     
     def get_initial_resources(self):
@@ -87,17 +93,22 @@ class Game:
         return self.players
     
     def apply_action(self, agent, action):
-        if self.players[0].name == agent.name:
-            self.system.apply_action(self.players[0].name,action)
-            self.players[0].activate_action_mask(action)
-            self.players[1].deactivate_action_mask(action)
+        if action == "No Action":
+            count = self.system.apply_action(agent.name, action)
+            return count
+        red_agent, blue_agent = (self.players[0], self.players[1]) if self.players[0].name == "red_agent" else (self.players[1], self.players[0])
+        if agent.name=="red_agent":
+            count = self.system.apply_action(red_agent.name,action)
+            red_agent.activate_action_mask(action)
+            blue_agent.deactivate_action_mask(action)
         else:
-            self.system.apply_action(self.players[1].name,action)
-            self.players[1].activate_action_mask(action)
-            self.players[0].deactivate_action_mask(action)
-    
+            count = self.system.apply_action(blue_agent.name,action)
+            blue_agent.activate_action_mask(action)
+        return count
+
     def choose_action(self,agent):
         valid_actions=agent.valid_actions_mask["Active"]
-        return valid_actions[random.randint(0,len(valid_actions) - 1)]
+        idx = random.randint(0,len(valid_actions) - 1)
+        return valid_actions[idx], self.costs[idx]
     
     

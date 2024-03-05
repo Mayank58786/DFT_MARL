@@ -5,8 +5,9 @@ class System:
         self.precedences = []
         self.state = 0
         self.actions = []
+        self.costs = {}
         self.observations = []
-        self.repairing_list = []
+        self.repairing_dict = {}
 
     def add_event(self, event):
         self.events[event.name] = event
@@ -34,7 +35,7 @@ class System:
                 event.state=event.initial_state
         Event.update_event(self.top_event)
         self.state = self.top_event.state
-        self.repairing_list = []
+        self.repairing_dict = {}
         return self
         
 
@@ -43,13 +44,15 @@ class System:
         self.reset_system()
         Event.update_event(self.top_event)
         
-        self._set_actions()
-        self._set_observations()
+        self.set_actions()
+        self.set_observations()
 
     def set_actions(self):
         no_action = No_Action('No Action')
-        actions = [no_action]
-        for event in self.get_basicEvents():
+        self.add_event(no_action)
+        actions = [no_action.name]
+        basic_events = list(self.get_basicEvents())
+        for event in basic_events:
             actions.append(event.name)
         self.actions = actions
     
@@ -57,8 +60,22 @@ class System:
         return self.actions
     
     def set_observations(self):
-        self.observations = list(self.events.keys())
+        event_list=list(self.events.keys())
+        event_list.sort()
+        observations=[]
+        for event in event_list:
+            observations.append(self.events[event].state)
+        self.observations = observations
         
+    def set_costs(self):
+        costs = [0]
+        basic_event = list(self.get_basicEvents())
+        for event in basic_event.sort():
+            costs.append(event.failure_cost)
+        self.costs = costs
+    
+    def get_costs(self):
+        return self.costs
     
     def get_observations(self):
         return self.observations
@@ -68,24 +85,27 @@ class System:
     
     def num_actions(self):
         if not self.actions:
-            return len(self._set_actions())
+            return len(self.set_actions())
         else:
             return len(self.actions)
     
     def num_observations(self):
         if not self.observations:
-            return len(self._set_observations())
+            return len(self.set_observations())
         else:
             return len(self.observations)
 
     def apply_action(self, agent, action):
-        #print(stratergy_type)
+        #print(action)
         event = self.get_object(action)
         if agent == 'red_agent':
-            event.red_action()
+            count = event.red_action()
         elif agent == 'blue_agent':
-            event.blue_action()
-            self.repairing_list.append(action)
+            count,visited = event.blue_action()
+            if not action == "No Action":
+                self.repairing_dict[action] = visited
+                #print(visited)
+        return count
 
     def get_events(self):
         return self.events
@@ -102,3 +122,7 @@ class System:
     def get_system_state(self):
         self.state = self.get_top_event().state
         return self.state
+    
+    def observe(self):
+        self.set_observations()
+        return self.get_observations()
