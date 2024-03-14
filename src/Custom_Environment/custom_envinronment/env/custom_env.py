@@ -7,7 +7,7 @@ class CustomEnvironment(AECEnv):
         "name": "custom_environment_v0",
     }
 
-    def __init__(self, system, game, resources, render_mode = None):
+    def __init__(self, system, game, render_mode = None):
         super().__init__()
         self.reward_range = (-np.inf, np.inf)
         self.system = system
@@ -27,9 +27,9 @@ class CustomEnvironment(AECEnv):
         self.agent_selection = self._agent_selector.next()  
 
         # Spaces
-        self.action_spaces = {agent: Discrete(len(self.system.get_actions())) for agent in self.possible_agents}                      
-        self.observation_spaces = {agent: MultiBinary(1) for agent in self.possible_agents} 
-        self.observations = {agent: self.system.get_observations() for agent in self.agents}
+        self.action_space = Discrete(len(self.system.get_actions()))                    
+        self.observation_space = MultiBinary(len(self.system.events))
+        self.observation = self.system.get_observations()
 
         # Rewards
         self.rewards = {agent : 0 for agent in self.agents}
@@ -42,9 +42,9 @@ class CustomEnvironment(AECEnv):
     def reset(self, seed=None, options=None):
 
         self.agents = self.possible_agents.copy()
-        self.resources = self.initial_resources
         self.timestep = 0
         self.game.reset_game()
+        self.resources = self.game.initial_resources
         self.system.reset_system()
         self._agent_selector = agent_selector(self.agents)
         self.agent_selection = self._agent_selector.reset()
@@ -54,14 +54,24 @@ class CustomEnvironment(AECEnv):
         self.truncations = {agent: False for agent in self.agents}
         self.system_state = self.system.state
         self.infos = {agent: {} for agent in self.agents}
-        self.action_spaces = {agent: Discrete(len(self.system.get_actions())) for agent in self.possible_agents}                      
-        self.observation_spaces = {agent: MultiBinary(1) for agent in self.possible_agents} 
-        self.observations = {agent: self.system.get_observations() for agent in self.agents}  
+        self.action_space = Discrete(len(self.system.get_actions()))                    
+        self.observation_space = MultiBinary(len(self.system.events))
+        self.observation = self.system.get_observations()  
         if self.render_mode == "human":
             self.render()
-        return self.observations
+        # print(self.agents)
+        # print(self.resources)
+        # print(self.rewards)
+        # print(self.terminations)
+        # print(self.truncations)
+        # print(self.system_state)
+        # print(self.infos)
+        # print(self.action_space)
+        # print(self.observation_space)
 
-    def step(self):
+        return self.observation
+
+    def step(self,act):
         to_be_deleted=[]
         red_agent, blue_agent = (self.game.players[0], self.game.players[1]) if self.game.players[0].name == "red_agent" else (self.game.players[1], self.game.players[0])
         for action in self.system.repairing_dict.keys():
@@ -76,19 +86,20 @@ class CustomEnvironment(AECEnv):
         for action in to_be_deleted:
             del self.system.repairing_dict[action]
             
-        
-        if (
-            self.terminations[self.agent_selection]
-            or self.truncations[self.agent_selection]
-        ):
-            self._was_dead_step(action)
-            return
-        
         # Selects agent for this step
         agent = self.agent_selection
+        
+        if (
+            True in self.terminations.values()
+            or True in self.truncations
+        ):
+            #self._was_dead_step(action)
+            return self.observation, self.rewards[agent], self.terminations, self.truncations, self.infos
+        
+        
 
-        action, cost = self.game.choose_action(agent)
-        print(action, cost)
+        action, cost = self.game.get_action(act)
+        #print(agent.name,action, cost)
         count = 0
         if cost > self.resources[agent]:
             count = self.game.apply_action(agent,'No Action')
@@ -113,18 +124,22 @@ class CustomEnvironment(AECEnv):
 
         # Increment timestep after all agents have taken their actions
         self.timestep += 1
+        self.system_state = self.system.get_system_state()
         # Update truncation - time is over.
         if self.timestep > self.NUM_ITERS:        
             self.truncations = {agent: True for agent in self.agents}
-        self.observations = {agent: self.system.observe() for agent in self.agents}
+            if self.system_state == 1:
+                self.rewards[blue_agent] += 1000
+        self.observation = self.system.observe()
         # Infos
-        self.infos = {"agent_red": {}, "agent_blue": {}}
+        self.infos = {agent : {} for agent in self.agents}
 
         # DEBUGGING!
         #self.infos = {"agent_red": {'time' : self.timestep, 'state' : self.system_state}, "agent_blue": {'time' : self.timestep, 'state' : self.system_state}}
         self.agent_selection = self._agent_selector.next()
         # Return observations, rewards, done, and info (customize as needed)
-        return self.observations, self.rewards, self.done, self.infos
+        # return agent.name,self.system_state, self.rewards[red_agent],self.rewards[blue_agent],self.observations, self.rewards, self.terminations, self.truncations, self.infos
+        return self.observation, self.rewards[agent], self.terminations[agent], self.truncations[agent], self.infos[agent]
 
     def render(self):
         pass
@@ -133,8 +148,8 @@ class CustomEnvironment(AECEnv):
         return self.observation_spaces[agent]
 
     def action_space(self, agent):
-        return self.action_spaces[agent]
+        return self.action_space
     
     def observe(self, agent):
-        return np.array(self.observations[agent])
+        return np.array(self.observation)
     

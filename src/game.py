@@ -23,6 +23,13 @@ class Game:
         self.resources = self.initial_resources
         for player in self.players:
             player.reset_player()
+        self.set_initial_resources()
+    
+    def set_initial_resources(self):
+        self.initial_resources = {}
+        for player in self.players:
+            self.initial_resources[player] = player.resources
+        
         
     def set_actions(self):
         if not self.system.actions:
@@ -83,8 +90,7 @@ class Game:
             return False
     
     def create_player(self, name, resources):
-        player = Player(name, self.actions)
-        self.initial_resources[player] = resources
+        player = Player(name, self.actions, resources)
         self.resources[player] = resources
         self.players.append(player)
         return player
@@ -106,9 +112,10 @@ class Game:
             blue_agent.activate_action_mask(action)
         return count
 
-    def choose_action(self,agent):
-        valid_actions=agent.valid_actions_mask["Active"]
-        idx = random.randint(0,len(valid_actions) - 1)
-        return valid_actions[idx], self.costs[idx]
+    def get_action(self,action_idx):
+        return self.actions[action_idx], self.costs[action_idx]
+    
+    def get_mask(self,player):
+        return player.valid_actions_mask
     
     

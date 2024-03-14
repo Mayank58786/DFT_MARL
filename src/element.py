@@ -146,6 +146,8 @@ class BasicEvent(Event):
 
     def blue_action(self):
         'inactivate basic event'
+        if self.state == 1:
+            return 0,[]
         self.repairing = 1
         Event.count = 0
         Event.blue_visited = []

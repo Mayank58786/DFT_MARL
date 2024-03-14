@@ -1,8 +1,9 @@
 class Player:
-    def __init__(self, name, actions):
+    def __init__(self, name, actions, resources):
         self.name = name
-        self.valid_actions = actions
-        self.valid_actions_mask = {}
+        self.resources = resources
+        self.valid_actions = [action for action in actions]
+        self.valid_actions_mask = []
         self.score = 0
         self.took_invalid_action = False
         self.reset_masks()
@@ -25,18 +26,19 @@ class Player:
         
     
     def activate_action_mask(self, action):
-        self.valid_actions_mask["Active"].remove(action)
-        self.valid_actions_mask["Not_Active"].append(action)
+        idx = self.valid_actions.index(action)
+        self.valid_actions_mask[idx] = 1
 
     def deactivate_action_mask(self, action):
-        self.valid_actions_mask["Not_Active"].remove(action)
-        self.valid_actions_mask["Active"].append(action)        
+        idx = self.valid_actions.index(action)
+        self.valid_actions_mask[idx] = 0     
     
     def reset_masks(self):
         if self.name == "red_agent":
-            self.valid_actions_mask = {"Active": list(self.valid_actions), "Not_Active": []}
+            self.valid_actions_mask = [1]*len(self.valid_actions)
         else:
-            self.valid_actions_mask = {"Active": self.valid_actions[0:1], "Not_Active": list(self.valid_actions[1:])}
+            self.valid_actions_mask = [1]
+            self.valid_actions_mask.extend([0]*(len(self.valid_actions) - 1))
     
     
 
