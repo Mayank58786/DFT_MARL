@@ -72,6 +72,7 @@ class CustomEnvironment(AECEnv):
         return self.observation
 
     def step(self,act):
+        
         to_be_deleted=[]
         red_agent, blue_agent = (self.game.players[0], self.game.players[1]) if self.game.players[0].name == "red_agent" else (self.game.players[1], self.game.players[0])
         for action in self.system.repairing_dict.keys():
@@ -88,7 +89,7 @@ class CustomEnvironment(AECEnv):
             
         # Selects agent for this step
         agent = self.agent_selection
-        
+        self.rewards[agent] = 0
         if (
             True in self.terminations.values()
             or True in self.truncations
@@ -100,36 +101,42 @@ class CustomEnvironment(AECEnv):
 
         action, cost = self.game.get_action(act)
         #print(agent.name,action, cost)
-        count = 0
-        if cost > self.resources[agent]:
-            count = self.game.apply_action(agent,'No Action')
+        if agent.valid_actions_mask[act] == 0:
+            action = 'No Action'
             count = 0
         else:
-            self.resources[agent] -= cost
-            count = self.game.apply_action(agent, action)
-        self.rewards[agent] += 1
-        self.rewards[agent] += count
-        #no reactive repairing instead preventive maintainance
-        if agent.name == "red_agent":        
-            if self.system.state == 1:
-                self.rewards[agent] -= 1
+            count = 0
+            if cost > self.resources[agent]:
+                count = self.game.apply_action(agent,'No Action')
+                count = 0
             else:
-                self.rewards[agent] += 10000
-                # Update termination – game is "won"
-                self.terminations = {agent: True for agent in self.agents}
-        else:
-            if self.system.state == 1:
-               self.rewards[agent] += 1
+                self.resources[agent] -= cost
+                count = self.game.apply_action(agent, action)
+            self.rewards[agent] += 1
+            self.rewards[agent] += count
+            #no reactive repairing instead preventive maintainance
+            if agent.name == "red_agent":        
+                if self.system.state == 1:
+                    self.rewards[agent] -= 1
+                else:
+                    self.rewards[agent] += 10
+                    # Update termination – game is "won"
+                    self.terminations = {agent: True for agent in self.agents}
+            else:
+                if self.system.state == 1:
+                    self.rewards[agent] += 1
             
 
         # Increment timestep after all agents have taken their actions
         self.timestep += 1
         self.system_state = self.system.get_system_state()
+        if self.system.state == 0:
+            pass
         # Update truncation - time is over.
         if self.timestep > self.NUM_ITERS:        
             self.truncations = {agent: True for agent in self.agents}
             if self.system_state == 1:
-                self.rewards[blue_agent] += 1000
+                self.rewards[blue_agent] += 10
         self.observation = self.system.observe()
         # Infos
         self.infos = {agent : {} for agent in self.agents}

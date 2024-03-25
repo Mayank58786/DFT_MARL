@@ -27,15 +27,16 @@ class Player:
     
     def activate_action_mask(self, action):
         idx = self.valid_actions.index(action)
-        self.valid_actions_mask[idx] = 1
+        self.valid_actions_mask[idx] = 0
 
     def deactivate_action_mask(self, action):
         idx = self.valid_actions.index(action)
-        self.valid_actions_mask[idx] = 0     
+        self.valid_actions_mask[idx] = 1    
     
     def reset_masks(self):
         if self.name == "red_agent":
             self.valid_actions_mask = [1]*len(self.valid_actions)
+            self.valid_actions_mask[0] = 0
         else:
             self.valid_actions_mask = [1]
             self.valid_actions_mask.extend([0]*(len(self.valid_actions) - 1))
