@@ -3,7 +3,6 @@ import argparse
 import os
 import random
 import time
-from distutils.util import strtobool
 
 import gym
 import numpy as np
@@ -103,7 +102,7 @@ if __name__ == "__main__":
     clip_coef = 0.1
     gamma = 0.99
     batch_size = 32
-    total_episodes = 500
+    total_episodes = 75000
     time = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
     """ ENV SETUP """
     env = env_creator.create_env()
@@ -384,12 +383,12 @@ if __name__ == "__main__":
         print("\n-------------------------------------------\n")
     #print(len(value_losses_red),len(policy_losses_red),len(old_approx_kls_red),len(approx_kls_red),len(clip_fractions_red),len(explained_variances_red))
         #print("actions:",action_sequence)
-    torch.save(red_agent.actor.state_dict(), PATH + 'ppo_actor_red_agent.pth')
-    torch.save(red_agent.critic.state_dict(), PATH + 'ppo_critic__red_agent.pth')
-    torch.save(blue_agent.actor.state_dict(), PATH + 'ppo_actor_blue_agent.pth')
-    torch.save(blue_agent.critic.state_dict(), PATH + 'ppo_critic__blue_agent.pth')
+    torch.save(red_agent.actor.state_dict(), PATH + str(total_episodes) + 'ppo_actor_red_agent.pth')
+    torch.save(red_agent.critic.state_dict(), PATH + str(total_episodes) +'ppo_critic__red_agent.pth')
+    torch.save(blue_agent.actor.state_dict(), PATH + str(total_episodes) + 'ppo_actor_blue_agent.pth')
+    torch.save(blue_agent.critic.state_dict(), PATH + str(total_episodes) +'ppo_critic__blue_agent.pth')
 # Plotting
-skip_episodes = 10
+skip_episodes = 100
 episodes = range(0, total_episodes, skip_episodes)
 
 # Plot metrics for red agent

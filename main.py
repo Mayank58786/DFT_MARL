@@ -66,7 +66,7 @@ class Agent(nn.Module):
 
     def get_action_and_value(self, x, action=None, invalid_action_masks=None):
         logits = self.actor(x)
-        print(invalid_action_masks)
+        #print(invalid_action_masks)
         #split_logits = torch.split(logits, 1, dim=1)
         if invalid_action_masks is not None:
             #split_invalid_action_masks = torch.split(torch.tensor(invalid_action_masks), 1)
@@ -76,7 +76,7 @@ class Agent(nn.Module):
             multi_categoricals = Categorical(logits=logits)
         if action is None:
             action = multi_categoricals.sample()
-        print("action:",action)
+        #print("action:",action)
         logprob = multi_categoricals.log_prob(action)
         entropy = multi_categoricals.entropy()
         return action, logprob, entropy
@@ -86,13 +86,15 @@ class Agent(nn.Module):
 
 red_agent_actor = Agent(env, name="red_agent")
 blue_agent_actor = Agent(env, name="blue_agent")
-red_agent_actor.actor.load_state_dict(torch.load(r"C:\Users\jhama\OneDrive\Documents\Stuttgart\Lectures\Sem3\RP\marl\DFT_MARL\PPO_Agent\ppo_actor_red_agent.pth"))
-blue_agent_actor.actor.load_state_dict(torch.load(r"C:\Users\jhama\OneDrive\Documents\Stuttgart\Lectures\Sem3\RP\marl\DFT_MARL\PPO_Agent\ppo_actor_blue_agent.pth"))
+red_agent_actor.actor.load_state_dict(torch.load("PPO_Agent/75000ppo_actor_red_agent.pth"))
+blue_agent_actor.actor.load_state_dict(torch.load("PPO_Agent/75000ppo_actor_blue_agent.pth"))
 # red_agent_critic = torch.load('PPO_Agent/ppo_critic_red_agent.pth')
 # blue_agent_critic = torch.load('PPO_Agent/ppo_critic_blue_agent.pth')
 
 agents = {"red_agent":red_agent_actor,
           "blue_agent":blue_agent_actor}
+wins = {"red":0,"blue":0}
+red_win_actions = []
 for i in range(game_plays):
     obs = env.reset(seed=None)
     agent_nn = "red_agent"
@@ -104,7 +106,7 @@ for i in range(game_plays):
             actions[key] = []
             rewards[key] = 0
             invalid_action_masks[key] = []
-    print(actions,rewards,invalid_action_masks)
+    #print(actions,rewards,invalid_action_masks)
     
     for step in range(0, max_cycles):
         observation, reward, termination, truncation, info = env.last()
@@ -113,9 +115,9 @@ for i in range(game_plays):
             break
         else:
             invalid_action_masks[agent_nn] = env.game.get_mask(agent)[:len(env.game.actions)]
-            print(observation.shape)
+            #print(observation.shape)
             obs = batchify_obs(observation, device)
-            print(obs.shape)
+            #print(obs.shape)
             action_mask = env.game.get_mask(agent)[:len(env.game.actions)]
             #print(action_mask)
             action_mask = batchify_obs(action_mask[:len(env.game.actions)], device)
@@ -129,12 +131,15 @@ for i in range(game_plays):
             invalid_action_masks[agent_nn].append(agent.valid_actions_mask[:len(env.game.actions)])
         #agent = env.agent_selection
         agent_nn = "blue_agent" if (agent_nn == "red_agent") else "red_agent"
-    print(actions,rewards)
+    #print(actions,rewards)
     if env.system_state == 1:
-        print("blue wins")
+        wins["blue"] += 1
+        
     else:
-        print("red wins")
-
+        wins["red"] += 1
+        # print(actions["red_agent"])
+    print(actions)
+print(wins)
 
 
         
