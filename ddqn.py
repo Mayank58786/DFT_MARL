@@ -15,9 +15,9 @@ class ReplayBuffer():
         self.mem_size = max_size
         self.mem_cntr = 0 # index of last stored memory
         #print("input shape",input_shape)
-        self.state_memory = np.zeros((self.mem_size, *input_shape),
+        self.state_memory = np.zeros((self.mem_size, input_shape),
                                      dtype=np.float32)
-        self.new_state_memory = np.zeros((self.mem_size, *input_shape),
+        self.new_state_memory = np.zeros((self.mem_size, input_shape),
                                      dtype=np.float32)
         self.action_memory = np.zeros(self.mem_size, dtype=np.int64)
         self.reward_memory = np.zeros(self.mem_size, dtype=np.float32)
@@ -27,13 +27,13 @@ class ReplayBuffer():
         index = self.mem_cntr % self.mem_size
         #print(self.mem_cntr)
         #print(state_)
-        for agent in env.agents:
-            self.state_memory[index] = state
-            self.new_state_memory[index] = state_[agent]
-            self.reward_memory[index] = reward[agent]
-            #print(done)
-            self.action_memory[index] = action
-            self.terminal_memory[index] = done
+        
+        self.state_memory[index] = state
+        self.new_state_memory[index] = state_
+        self.reward_memory[index] = reward
+        #print(done)
+        self.action_memory[index] = action
+        self.terminal_memory[index] = done
         self.mem_cntr += 1
 
     # for usinform sampling of memory when agent learns
@@ -52,7 +52,7 @@ class ReplayBuffer():
 
     
 class Agent():
-    def __init__(self, gamma, epsilon, lr, n_actions, input_dims,
+    def __init__(self, name,gamma, epsilon, lr, n_actions, input_dims,
                  mem_size, batch_size, eps_min=0.01, eps_dec=5e-7,
                  replace=1000, chkpt_dir='tmp/double_dqn'):
         # epsilon is the fraction of timeit spends on taking random actions
@@ -73,24 +73,33 @@ class Agent():
         self.memory = ReplayBuffer(mem_size, len(input_dims))
         self.q_eval = DoubleDeepQNetwork(self.lr, self.n_actions,
                                          input_dims = self.input_dims,
-                                         name='DoubleDeepQNetwork_q_eval',
+                                         name=name+'DoubleDeepQNetwork_q_eval',
                                          chkpt_dir=self.chkpt_dir)
         self.q_next = DoubleDeepQNetwork(self.lr, self.n_actions,
                                          input_dims = self.input_dims,
-                                         name='DoubleDeepQNetwork_q_next',
+                                         name=name+'DoubleDeepQNetwork_q_next',
                                          chkpt_dir=self.chkpt_dir)
         
         #random number less than epsilon it takes a random action
         # if the random number is greater than epsilon ot takes a greedy action
 
-    def choose_action(self, observation):
-        if np.random.random() > self.epsilon:
-            state = T.tensor([observation], dtype=T.float).to(self.q_eval.device)
-            print("state final..........",state)
-            _, advantage = self.q_eval.forward(state)
-            action = T.argmax(advantage).item()
+    def choose_action(self, observation,action_mask):
+        if action_mask is not None:
+            valid_actions = np.where(action_mask)[0]  # Get indices of valid actions
+            if np.random.random() > self.epsilon:
+                state = T.tensor([observation], dtype=T.float).to(self.q_eval.device)
+                _, advantage = self.q_eval.forward(state)
+                masked_advantage = advantage[:, valid_actions]  # Consider only valid actions
+                action = valid_actions[T.argmax(masked_advantage).item()]
+            else:
+                action = np.random.choice(valid_actions)
         else:
-            action = np.random.choice(self.action_space)
+            if np.random.random() > self.epsilon:
+                state = T.tensor([observation], dtype=T.float).to(self.q_eval.device)
+                _, advantage = self.q_eval.forward(state)
+                action = T.argmax(advantage).item()
+            else:
+                action = np.random.choice(self.action_space)
         return action
     
     def store_transition(self, state, action, reward, state_, done):
@@ -113,11 +122,11 @@ class Agent():
         self.q_eval.load_checkpoint()
         self.q_next.load_checkpoint()
 
-    def learn(self):
+    def learn(self,i):
         # if the model hasn't filled the batch_size of memory
         if self.memory.mem_cntr < self.batch_size:
             return
-        
+        #print(i)
         self.q_eval.optimizer.zero_grad()
         self.replace_target_network()
 
@@ -127,12 +136,12 @@ class Agent():
         # print("state........................",state)
         states = T.tensor(state).to(self.q_eval.device)
         actions = T.tensor(action).to(self.q_eval.device)
-        dones = T.tensor(done).to(self.q_eval.device)
+        dones = T.tensor(done).bool().to(self.q_eval.device)
         rewards = T.tensor(reward).to(self.q_eval.device)
         states_ = T.tensor(new_state).to(self.q_eval.device)
 
         indices = np.arange(self.batch_size)
-        print("states........................",states)
+        #print("states........................",states)
         if(states.numel() != 0):
             V_s, A_s = self.q_eval.forward(states)
             V_s_, A_s_ = self.q_next.forward(states_)
@@ -192,3 +201,67 @@ class DoubleDeepQNetwork(nn.Module):
         print('... loading checkpoint ....')
         self.load_state_dict(T.load(self.checkpoint_file))
 
+if __name__ == '__main__':
+    env = env_creator.create_env()
+    num_agents = len(env.possible_agents)
+    num_actions = env.action_space.n
+    observation_size = env.observation_space.shape
+    observation = env.game.observations
+    max_cycles = env.game.get_max_steps() + 4
+    
+    num_games = 1000
+    load_checkpoint = False
+
+    red_agent = Agent(name= "red_agent", gamma=0.99, epsilon=0.1, lr=5e-4,
+                  input_dims=observation, n_actions=num_actions, mem_size=1000000, eps_min=0.01,
+                  batch_size=32, eps_dec=1e-3, replace=100)
+    blue_agent = Agent(name= "blue_agent", gamma=0.99, epsilon=0.1, lr=5e-4,
+                  input_dims=observation, n_actions=num_actions, mem_size=1000000, eps_min=0.01,
+                  batch_size=32, eps_dec=1e-3, replace=100)
+    agents = {"red_agent":red_agent, "blue_agent":blue_agent}
+    if load_checkpoint:
+        for k,v in agents.items():
+            v.load_models
+    
+    filename = 'DFT-DDQN.png'
+    scores, eps_history = {},{}
+    wins = {"red_agent":0, "blue_agent":0}
+    for k in agents.keys():
+        scores[k] = []
+        eps_history[k] = []
+
+    for i in range(num_games):
+        print("episode ", i)
+        done = False
+        observation = env.reset()
+        score = {}
+        for k,v in agents.items():
+            score[k] = 0
+        agent_nn = "red_agent"
+        while not done:
+            observation, reward, termination, truncation, info = env.last()
+            #print(observation)
+            if termination or truncation:
+                action = None
+                break
+            env_agent = env.agent_selection
+            action_mask = env.game.get_mask(env_agent)
+            action = agents[agent_nn].choose_action(observation,action_mask)
+            new_observation, reward, termination, truncation, info = env.step(action)
+            if termination or truncation:
+                done = True
+            score[agent_nn] += reward
+            agents[agent_nn].store_transition(observation, action, reward, 
+                                    new_observation, done)
+            agents[agent_nn].learn(i)
+            agent_nn = "blue_agent" if agent_nn == "red_agent" else "red_agent"
+        for k in scores.keys():
+            scores[k].append(score[k])
+        if env.system.state == 1:
+            wins["blue_agent"] += 1
+        else:
+            wins["red_agent"] += 1
+    print(wins)
+            
+
+            
