@@ -86,6 +86,8 @@ class Agent():
     def choose_action(self, observation,action_mask):
         if action_mask is not None:
             valid_actions = np.where(action_mask)[0]  # Get indices of valid actions
+            if len(valid_actions) == 0:
+                return 0
             if np.random.random() > self.epsilon:
                 state = T.tensor([observation], dtype=T.float).to(self.q_eval.device)
                 _, advantage = self.q_eval.forward(state)
@@ -194,14 +196,13 @@ class DoubleDeepQNetwork(nn.Module):
     
     def save_checkpoint(self):
         print('.......saving a checkpoint....')
-        print(self.state_dict())
+        #print(self.state_dict())
         T.save(self.state_dict(), self.checkpoint_file)
 
-    def load_checkpoint(self, file):
+    def load_checkpoint(self):
         print('... loading checkpoint ....')
-        self.load_state_dict(T.load(self.checkpoint_file))
-
-if __name__ == '__main__':
+        self.load_state_dict(T.load(self.checkpoint_file,map_location=T.device('cpu')))
+def play():
     env = env_creator.create_env()
     num_agents = len(env.possible_agents)
     num_actions = env.action_space.n
@@ -209,27 +210,19 @@ if __name__ == '__main__':
     observation = env.game.observations
     max_cycles = env.game.get_max_steps() + 4
     
-    num_games = 1000
-    load_checkpoint = False
-
-    red_agent = Agent(name= "red_agent", gamma=0.99, epsilon=0.1, lr=5e-4,
+    num_games = 50
+    red_agent = Agent(name= "red_agent_25000", gamma=0.99, epsilon=1.0, lr=5e-4,
                   input_dims=observation, n_actions=num_actions, mem_size=1000000, eps_min=0.01,
                   batch_size=32, eps_dec=1e-3, replace=100)
-    blue_agent = Agent(name= "blue_agent", gamma=0.99, epsilon=0.1, lr=5e-4,
+    blue_agent = Agent(name= "blue_agent_25000", gamma=0.99, epsilon=1.0, lr=5e-4,
                   input_dims=observation, n_actions=num_actions, mem_size=1000000, eps_min=0.01,
                   batch_size=32, eps_dec=1e-3, replace=100)
     agents = {"red_agent":red_agent, "blue_agent":blue_agent}
-    if load_checkpoint:
-        for k,v in agents.items():
-            v.load_models
-    
-    filename = 'DFT-DDQN.png'
-    scores, eps_history = {},{}
-    wins = {"red_agent":0, "blue_agent":0}
-    for k in agents.keys():
-        scores[k] = []
-        eps_history[k] = []
-
+    for k,v in agents.items():
+        v.load_models()
+    scores = {"red_agent":[],"blue_agent":[]}
+    actions = {"red_agent":[],"blue_agent":[]}
+    wins = {"red_agent":0,"blue_agent":0}
     for i in range(num_games):
         print("episode ", i)
         done = False
@@ -238,6 +231,7 @@ if __name__ == '__main__':
         for k,v in agents.items():
             score[k] = 0
         agent_nn = "red_agent"
+        action_taken={"red_agent":[],"blue_agent":[]}
         while not done:
             observation, reward, termination, truncation, info = env.last()
             #print(observation)
@@ -247,21 +241,88 @@ if __name__ == '__main__':
             env_agent = env.agent_selection
             action_mask = env.game.get_mask(env_agent)
             action = agents[agent_nn].choose_action(observation,action_mask)
+            action_taken[agent_nn].append(env.game.actions[action]) 
             new_observation, reward, termination, truncation, info = env.step(action)
             if termination or truncation:
                 done = True
             score[agent_nn] += reward
-            agents[agent_nn].store_transition(observation, action, reward, 
-                                    new_observation, done)
-            agents[agent_nn].learn(i)
+            
             agent_nn = "blue_agent" if agent_nn == "red_agent" else "red_agent"
         for k in scores.keys():
             scores[k].append(score[k])
+        for k in actions.keys():
+            actions[k].append(action_taken[k])
         if env.system.state == 1:
             wins["blue_agent"] += 1
         else:
             wins["red_agent"] += 1
+    
+    print(scores)
     print(wins)
-            
+    #print(actions)
+# if __name__ == '__main__':
+#     env = env_creator.create_env()
+#     num_agents = len(env.possible_agents)
+#     num_actions = env.action_space.n
+#     observation_size = env.observation_space.shape
+#     observation = env.game.observations
+#     max_cycles = env.game.get_max_steps() + 4
+    
+#     num_games = 25000
+#     load_checkpoint = False
 
-            
+#     red_agent = Agent(name= "red_agent_25000", gamma=0.99, epsilon=0.5, lr=5e-4,
+#                   input_dims=observation, n_actions=num_actions, mem_size=1000000, eps_min=0.01,
+#                   batch_size=32, eps_dec=1e-3, replace=100)
+#     blue_agent = Agent(name= "blue_agent_25000", gamma=0.99, epsilon=0.5, lr=5e-4,
+#                   input_dims=observation, n_actions=num_actions, mem_size=1000000, eps_min=0.01,
+#                   batch_size=32, eps_dec=1e-3, replace=100)
+#     agents = {"red_agent":red_agent, "blue_agent":blue_agent}
+#     if load_checkpoint:
+#         for k,v in agents.items():
+#             v.load_models()
+    
+#     filename = 'DFT-DDQN.png'
+#     scores, eps_history = {},{}
+#     wins = {"red_agent":0, "blue_agent":0}
+#     for k in agents.keys():
+#         scores[k] = []
+#         eps_history[k] = []
+
+#     for i in range(num_games):
+#         print("episode ", i)
+#         done = False
+#         observation = env.reset()
+#         score = {}
+#         for k,v in agents.items():
+#             score[k] = 0
+#         agent_nn = "red_agent"
+#         while not done:
+#             observation, reward, termination, truncation, info = env.last()
+#             #print(observation)
+#             if termination or truncation:
+#                 action = None
+#                 break
+#             env_agent = env.agent_selection
+#             action_mask = env.game.get_mask(env_agent)
+#             action = agents[agent_nn].choose_action(observation,action_mask)
+#             new_observation, reward, termination, truncation, info = env.step(action)
+#             if termination or truncation:
+#                 done = True
+#             score[agent_nn] += reward
+#             agents[agent_nn].store_transition(observation, action, reward, 
+#                                     new_observation, done)
+#             agents[agent_nn].learn(i)
+#             agent_nn = "blue_agent" if agent_nn == "red_agent" else "red_agent"
+#         for k in scores.keys():
+#             scores[k].append(score[k])
+#         if env.system.state == 1:
+#             wins["blue_agent"] += 1
+#         else:
+#             wins["red_agent"] += 1
+#     print(wins)
+#     for k,v in agents.items():
+#         v.save_models()
+#     play()
+
+play() 

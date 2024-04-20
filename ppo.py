@@ -102,7 +102,7 @@ if __name__ == "__main__":
     clip_coef = 0.1
     gamma = 0.99
     batch_size = 32
-    total_episodes = 75000
+    total_episodes = 25000
     time = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
     """ ENV SETUP """
     env = env_creator.create_env()

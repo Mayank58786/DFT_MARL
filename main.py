@@ -12,7 +12,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 gpu = False
 device = torch.device("cuda" if (torch.cuda.is_available() and gpu) else "cpu")
 env = env_creator.create_env()
-game_plays = 10
+game_plays = 50
 max_cycles = env.game.get_max_steps() + 4
 
 class CategoricalMasked(Categorical):
@@ -86,8 +86,8 @@ class Agent(nn.Module):
 
 red_agent_actor = Agent(env, name="red_agent")
 blue_agent_actor = Agent(env, name="blue_agent")
-red_agent_actor.actor.load_state_dict(torch.load("PPO_Agent/75000ppo_actor_red_agent.pth"))
-blue_agent_actor.actor.load_state_dict(torch.load("PPO_Agent/75000ppo_actor_blue_agent.pth"))
+red_agent_actor.actor.load_state_dict(torch.load("PPO_Agent/25000ppo_actor_red_agent.pth"))
+blue_agent_actor.actor.load_state_dict(torch.load("PPO_Agent/25000ppo_actor_blue_agent.pth"))
 # red_agent_critic = torch.load('PPO_Agent/ppo_critic_red_agent.pth')
 # blue_agent_critic = torch.load('PPO_Agent/ppo_critic_blue_agent.pth')
 
@@ -138,7 +138,7 @@ for i in range(game_plays):
     else:
         wins["red"] += 1
         # print(actions["red_agent"])
-    print(actions)
+    #print(actions)
 print(wins)
 
 
